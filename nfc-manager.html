@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#0a0f1e">
+<title>NFC Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07090f;
+    --surface: #0d1221;
+    --surface2: #131929;
+    --border: #1e2a42;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --danger: #ef4444;
+    --warn: #f59e0b;
+    --text: #e8eef8;
+    --text2: #8a9dc0;
+    --text3: #4a5a7a;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --glow: 0 0 20px rgba(0,229,255,0.15);
+    --glow2: 0 0 20px rgba(124,58,237,0.2);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; padding-bottom: 80px; }
+
+  /* Header */
+  .header {
+    padding: 24px 20px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(7,9,15,0.9);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: var(--glow);
+  }
+
+  .logo-text {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text);
+  }
+
+  .logo-sub {
+    font-size: 10px;
+    color: var(--accent);
+    font-family: var(--mono);
+    letter-spacing: 0.1em;
+  }
+
+  .header-count {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text2);
+  }
+
+  .header-count span { color: var(--accent); }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    padding: 16px 20px 0;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px 0;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+    font-family: var(--mono);
+  }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab:hover:not(.active) { color: var(--text2); }
+
+  /* Pages */
+  .page { display: none; padding: 20px; }
+  .page.active { display: block; }
+
+  /* NFC Scanner */
+  .scanner-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 0 24px;
+    gap: 24px;
+  }
+
+  .scanner-ring {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .scanner-ring::before, .scanner-ring::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(0,229,255,0.3);
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  .scanner-ring::before { width: 100%; height: 100%; animation-delay: 0s; }
+  .scanner-ring::after { width: 130%; height: 130%; animation-delay: 0.5s; }
+
+  @keyframes pulse-ring {
+    0% { transform: scale(0.8); opacity: 0.8; }
+    100% { transform: scale(1.1); opacity: 0; }
+  }
+
+  .scanner-ring.scanning::before,
+  .scanner-ring.scanning::after {
+    border-color: rgba(0,229,255,0.6);
+    animation: pulse-ring-active 1s ease-out infinite;
+  }
+
+  @keyframes pulse-ring-active {
+    0% { transform: scale(0.85); opacity: 1; }
+    100% { transform: scale(1.15); opacity: 0; }
+  }
+
+  .scanner-ring.success::before,
+  .scanner-ring.success::after {
+    border-color: rgba(16,185,129,0.6);
+  }
+
+  .scanner-core {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    box-shadow: var(--glow);
+    transition: all 0.3s;
+    position: relative;
+    z-index: 1;
+  }
+
+  .scanner-core.scanning {
+    border-color: var(--accent);
+    box-shadow: 0 0 30px rgba(0,229,255,0.3);
+    animation: core-pulse 1s ease-in-out infinite alternate;
+  }
+
+  .scanner-core.success {
+    border-color: var(--accent3);
+    box-shadow: 0 0 30px rgba(16,185,129,0.3);
+  }
+
+  @keyframes core-pulse {
+    from { box-shadow: 0 0 15px rgba(0,229,255,0.2); }
+    to { box-shadow: 0 0 40px rgba(0,229,255,0.5); }
+  }
+
+  .scan-status {
+    text-align: center;
+  }
+
+  .scan-status h3 {
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+
+  .scan-status p {
+    font-size: 12px;
+    color: var(--text2);
+    max-width: 260px;
+  }
+
+  .scan-status.scanning h3 { color: var(--accent); }
+  .scan-status.success h3 { color: var(--accent3); }
+  .scan-status.error h3 { color: var(--danger); }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 10px;
+    border: none;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(0,229,255,0.2);
+  }
+
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,229,255,0.3); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+  }
+
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent;
+    border: 1px solid rgba(239,68,68,0.3);
+    color: var(--danger);
+  }
+
+  .btn-danger:hover { background: rgba(239,68,68,0.1); }
+
+  .btn-success {
+    background: linear-gradient(135deg, #065f46, var(--accent3));
+    color: #fff;
+  }
+
+  .btn-sm { padding: 7px 14px; font-size: 11px; }
+  .btn-full { width: 100%; }
+
+  /* Tag result card */
+  .tag-result {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-top: 8px;
+    display: none;
+  }
+
+  .tag-result.visible { display: block; }
+
+  .tag-result-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .tag-result-row:last-child { margin-bottom: 0; }
+
+  .tag-result-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    min-width: 70px;
+    padding-top: 2px;
+  }
+
+  .tag-result-val {
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-all;
+    flex: 1;
+  }
+
+  .tag-result-val.mono { font-family: var(--mono); color: var(--accent); font-size: 12px; }
+
+  /* Library entries */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--text2);
+  }
+
+  .entry-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .entry-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .entry-card:hover { border-color: rgba(0,229,255,0.3); box-shadow: var(--glow); }
+  .entry-card:hover::before { opacity: 1; }
+  .entry-card.selected { border-color: var(--accent); }
+  .entry-card.selected::before { opacity: 1; }
+
+  .entry-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .entry-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
+  }
+
+  .entry-type-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.2);
+    color: var(--accent);
+    letter-spacing: 0.06em;
+  }
+
+  .entry-id {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    margin-bottom: 6px;
+  }
+
+  .entry-data {
+    font-size: 12px;
+    color: var(--text2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .entry-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+
+  .entry-card.expanded .entry-actions { display: flex; }
+
+  .entry-notes {
+    font-size: 12px;
+    color: var(--text2);
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 12px;
+    display: none;
+    border: 1px solid var(--border);
+  }
+
+  .entry-card.expanded .entry-notes { display: block; }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text3);
+  }
+
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+  .empty-state h3 { font-family: var(--mono); font-size: 13px; margin-bottom: 6px; color: var(--text2); }
+  .empty-state p { font-size: 12px; line-height: 1.6; }
+
+  /* Modal / Drawer */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .overlay.active { opacity: 1; pointer-events: all; }
+
+  .drawer {
+    position: fixed;
+    bottom: 0; left: 50%; transform: translateX(-50%) translateY(100%);
+    width: 100%; max-width: 480px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    z-index: 201;
+    padding: 24px 20px 40px;
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+
+  .drawer.active { transform: translateX(-50%) translateY(0); }
+
+  .drawer-handle {
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: -8px auto 20px;
+  }
+
+  .drawer-title {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+
+  /* Form */
+  .form-group { margin-bottom: 16px; }
+
+  .form-label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+
+  .form-input, .form-textarea, .form-select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+
+  .form-input:focus, .form-textarea:focus, .form-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+  }
+
+  .form-textarea { resize: none; height: 80px; line-height: 1.5; }
+
+  .form-input.mono-input {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  /* Emulate page */
+  .emulate-header {
+    background: var(--surface);
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .emulate-header .icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+
+  .emulate-header p {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+
+  .emulate-header strong { color: var(--warn); }
+
+  .emulate-select-wrap {
+    margin-bottom: 20px;
+  }
+
+  .emulate-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .emulate-card-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    margin-bottom: 12px;
+  }
+
+  .emulate-data-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .emulate-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    min-width: 80px;
+    padding-top: 3px;
+  }
+
+  .emulate-val {
+    font-size: 13px;
+    color: var(--text);
+    flex: 1;
+    word-break: break-all;
+  }
+
+  .emulate-val.mono { font-family: var(--mono); color: var(--accent); font-size: 12px; }
+
+  .simulate-btn-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .sim-status {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    text-align: center;
+    min-height: 18px;
+  }
+
+  .sim-status.active { color: var(--accent3); }
+
+  /* Notification */
+  .notif {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-family: var(--mono);
+    color: var(--text);
+    z-index: 300;
+    max-width: 340px;
+    width: 90%;
+    text-align: center;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+
+  .notif.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .notif.success { border-color: rgba(16,185,129,0.5); color: var(--accent3); }
+  .notif.error { border-color: rgba(239,68,68,0.4); color: var(--danger); }
+  .notif.warn { border-color: rgba(245,158,11,0.4); color: var(--warn); }
+
+  /* Bottom Nav */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    background: rgba(13,18,33,0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    z-index: 100;
+  }
+
+  .nav-btn {
+    flex: 1;
+    padding: 12px 0 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    transition: color 0.2s;
+  }
+
+  .nav-btn .nav-icon { font-size: 22px; }
+  .nav-btn.active { color: var(--accent); }
+
+  .nfc-unsupported {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    font-size: 12px;
+    color: var(--danger);
+    font-family: var(--mono);
+    text-align: center;
+    display: none;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  .badge-green { background: rgba(16,185,129,0.1); color: var(--accent3); border: 1px solid rgba(16,185,129,0.25); }
+  .badge-blue { background: rgba(0,229,255,0.08); color: var(--accent); border: 1px solid rgba(0,229,255,0.2); }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">📡</div>
+      <div>
+        <div class="logo-text">NFC MANAGER</div>
+        <div class="logo-sub">READ · SAVE · EMULATE</div>
+      </div>
+    </div>
+    <div class="header-count" id="headerCount"><span id="entryCountNum">0</span> TAGS</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('read')" id="tab-read">📡 READ</div>
+    <div class="tab" onclick="switchTab('library')" id="tab-library">🗂 LIBRARY</div>
+    <div class="tab" onclick="switchTab('emulate')" id="tab-emulate">🔁 EMULATE</div>
+  </div>
+
+  <!-- READ TAB -->
+  <div class="page active" id="page-read">
+
+    <div id="nfcUnsupported" class="nfc-unsupported">
+      ⚠ Web NFC not supported on this browser. Use Chrome on Android.
+    </div>
+
+    <div class="scanner-wrap">
+      <div class="scanner-ring" id="scannerRing">
+        <div class="scanner-core" id="scannerCore">📶</div>
+      </div>
+      <div class="scan-status" id="scanStatus">
+        <h3 id="scanStatusTitle">READY TO SCAN</h3>
+        <p id="scanStatusMsg">Tap the button below, then hold an NFC tag near your device.</p>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:20px;">
+      <button class="btn btn-primary" id="scanBtn" onclick="startScan()">
+        <span>⚡</span> START SCAN
+      </button>
+      <button class="btn btn-outline btn-sm" id="stopScanBtn" onclick="stopScan()" style="display:none;">
+        ✕ CANCEL
+      </button>
+    </div>
+
+    <!-- Result card -->
+    <div class="tag-result" id="tagResult">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.08em;color:var(--text3);">SCAN RESULT</span>
+        <span class="badge badge-green">✓ TAG FOUND</span>
+      </div>
+      <div class="tag-result-row">
+        <div class="tag-result-label">TAG ID</div>
+        <div class="tag-result-val mono" id="resultId">—</div>
+      </div>
+      <div class="tag-result-row">
+        <div class="tag-result-label">TYPE</div>
+        <div class="tag-result-val" id="resultType">—</div>
+      </div>
+      <div class="tag-result-row">
+        <div class="tag-result-label">RECORDS</div>
+        <div class="tag-result-val" id="resultRecords">—</div>
+      </div>
+      <div class="tag-result-row">
+        <div class="tag-result-label">DATA</div>
+        <div class="tag-result-val" id="resultData" style="font-size:12px;color:var(--text2);">—</div>
+      </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" onclick="saveScannedTag()">💾 SAVE TO LIBRARY</button>
+        <button class="btn btn-outline btn-sm" onclick="copyTagId()">📋 COPY ID</button>
+      </div>
+    </div>
+
+    <!-- Demo scan for testing -->
+    <div style="text-align:center;margin-top:20px;">
+      <button class="btn btn-outline btn-sm" onclick="demoScan()" style="font-size:10px;color:var(--text3);">
+        🧪 DEMO SCAN (test without NFC)
+      </button>
+    </div>
+
+  </div>
+
+  <!-- LIBRARY TAB -->
+  <div class="page" id="page-library">
+    <div class="section-header">
+      <div class="section-title">SAVED TAGS</div>
+      <button class="btn btn-primary btn-sm" onclick="openAddDrawer()">+ ADD TAG</button>
+    </div>
+
+    <div class="entry-list" id="entryList">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">🏷</div>
+        <h3>NO TAGS YET</h3>
+        <p>Scan an NFC tag and save it,<br>or add one manually.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMULATE TAB -->
+  <div class="page" id="page-emulate">
+
+    <div class="emulate-header">
+      <div class="icon">⚠️</div>
+      <p><strong>Browser Limitation:</strong> True NFC emulation (HCE) requires a native Android app. This page lets you <strong>simulate sending tag data</strong> for testing, logging, and sharing payloads. Use an NFC app like TagWriter to write entries to physical tags.</p>
+    </div>
+
+    <div class="form-group emulate-select-wrap">
+      <label class="form-label">SELECT ENTRY TO EMULATE</label>
+      <select class="form-select" id="emulateSelect" onchange="loadEmulateEntry()">
+        <option value="">— Choose a saved tag —</option>
+      </select>
+    </div>
+
+    <div class="emulate-card" id="emulateCard" style="display:none;">
+      <div class="emulate-card-title">TAG PAYLOAD PREVIEW</div>
+      <div class="emulate-data-row">
+        <div class="emulate-key">LABEL</div>
+        <div class="emulate-val" id="emLabel">—</div>
+      </div>
+      <div class="emulate-data-row">
+        <div class="emulate-key">TAG ID</div>
+        <div class="emulate-val mono" id="emId">—</div>
+      </div>
+      <div class="emulate-data-row">
+        <div class="emulate-key">TYPE</div>
+        <div class="emulate-val" id="emType">—</div>
+      </div>
+      <div class="emulate-data-row">
+        <div class="emulate-key">PAYLOAD</div>
+        <div class="emulate-val" id="emPayload" style="font-size:12px;color:var(--text2);">—</div>
+      </div>
+      <div class="emulate-data-row" id="emNotesRow" style="display:none;">
+        <div class="emulate-key">NOTES</div>
+        <div class="emulate-val" id="emNotes" style="font-size:12px;color:var(--text2);">—</div>
+      </div>
+    </div>
+
+    <div class="simulate-btn-wrap" id="emulateActions" style="display:none;">
+      <button class="btn btn-success btn-full" onclick="simulateEmit()">
+        📡 SIMULATE EMIT
+      </button>
+      <button class="btn btn-outline btn-full" onclick="copyPayload()">
+        📋 COPY PAYLOAD JSON
+      </button>
+      <div class="sim-status" id="simStatus"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <button class="nav-btn active" id="nav-read" onclick="switchTab('read')">
+    <span class="nav-icon">📡</span>READ
+  </button>
+  <button class="nav-btn" id="nav-library" onclick="switchTab('library')">
+    <span class="nav-icon">🗂</span>LIBRARY
+  </button>
+  <button class="nav-btn" id="nav-emulate" onclick="switchTab('emulate')">
+    <span class="nav-icon">🔁</span>EMULATE
+  </button>
+</div>
+
+<!-- Add/Edit Drawer -->
+<div class="overlay" id="overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-title" id="drawerTitle">ADD NFC ENTRY</div>
+
+  <div class="form-group">
+    <label class="form-label">LABEL / NAME *</label>
+    <input class="form-input" id="fieldName" placeholder="e.g. Office Keycard" maxlength="60">
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">TAG ID (UID)</label>
+    <input class="form-input mono-input" id="fieldId" placeholder="e.g. 04:A3:F1:B2:C4:12:80" maxlength="60">
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">TAG TYPE</label>
+      <select class="form-select" id="fieldType">
+        <option>NTAG213</option>
+        <option>NTAG215</option>
+        <option>NTAG216</option>
+        <option>MIFARE Classic</option>
+        <option>MIFARE Ultralight</option>
+        <option>ISO 14443-4</option>
+        <option>ISO 15693</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">RECORD TYPE</label>
+      <select class="form-select" id="fieldRecordType">
+        <option value="url">URL</option>
+        <option value="text">Text</option>
+        <option value="smart-poster">Smart Poster</option>
+        <option value="mime">MIME</option>
+        <option value="empty">Empty</option>
+        <option value="raw">Raw / Other</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">PAYLOAD / DATA</label>
+    <input class="form-input" id="fieldPayload" placeholder="e.g. https://example.com or plain text">
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">NOTES</label>
+    <textarea class="form-textarea" id="fieldNotes" placeholder="Any notes about this tag (location, purpose, etc.)"></textarea>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" style="flex:1;" onclick="saveEntry()">💾 SAVE</button>
+    <button class="btn btn-outline" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- Notification -->
+<div class="notif" id="notif"></div>
+
+<script>
+  // ─── State ───────────────────────────────────────────────
+  let entries = JSON.parse(localStorage.getItem('nfc_entries') || '[]');
+  let editingId = null;
+  let nfcReader = null;
+  let scannedTag = null;
+  let currentTab = 'read';
+
+  // ─── Init ─────────────────────────────────────────────────
+  function init() {
+    if (!('NDEFReader' in window)) {
+      document.getElementById('nfcUnsupported').style.display = 'block';
+    }
+    renderEntries();
+    updateCount();
+    populateEmulateSelect();
+  }
+
+  // ─── Tabs ─────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('page-' + tab).classList.add('active');
+    document.getElementById('nav-' + tab).classList.add('active');
+    currentTab = tab;
+  }
+
+  // ─── NFC Read ─────────────────────────────────────────────
+  async function startScan() {
+    if (!('NDEFReader' in window)) {
+      showNotif('Web NFC not supported. Use Chrome on Android.', 'error');
+      return;
+    }
+    try {
+      nfcReader = new NDEFReader();
+      await nfcReader.scan();
+
+      setScanState('scanning', 'SCANNING...', 'Hold an NFC tag close to the back of your device.');
+      document.getElementById('scanBtn').style.display = 'none';
+      document.getElementById('stopScanBtn').style.display = 'inline-flex';
+
+      nfcReader.addEventListener('reading', ({ message, serialNumber }) => {
+        stopScan();
+        const records = message.records || [];
+        let dataStr = '';
+        let recSummary = `${records.length} record${records.length !== 1 ? 's' : ''}`;
+
+        if (records.length > 0) {
+          const r = records[0];
+          if (r.recordType === 'url' || r.recordType === 'text') {
+            const decoder = new TextDecoder();
+            try {
+              dataStr = decoder.decode(r.data);
+            } catch(e) { dataStr = '[binary]'; }
+          } else {
+            dataStr = `[${r.recordType}]`;
+          }
+        }
+
+        scannedTag = {
+          id: serialNumber || generateId(),
+          type: 'Unknown (from scan)',
+          recordType: records.length > 0 ? records[0].recordType : 'empty',
+          records: recSummary,
+          data: dataStr
+        };
+
+        document.getElementById('resultId').textContent = scannedTag.id;
+        document.getElementById('resultType').textContent = scannedTag.type;
+        document.getElementById('resultRecords').textContent = scannedTag.records;
+        document.getElementById('resultData').textContent = scannedTag.data || '(empty)';
+        document.getElementById('tagResult').classList.add('visible');
+
+        setScanState('success', 'TAG DETECTED!', 'Tag read successfully. Save it to your library.');
+        showNotif('✓ NFC tag read successfully!', 'success');
+      });
+
+      nfcReader.addEventListener('readingerror', () => {
+        setScanState('error', 'READ ERROR', 'Could not read this tag. Try again.');
+        resetScanUI();
+        showNotif('Failed to read NFC tag.', 'error');
+      });
+
+    } catch (err) {
+      setScanState('error', 'PERMISSION DENIED', err.message || 'NFC permission was denied.');
+      resetScanUI();
+      showNotif('NFC permission denied.', 'error');
+    }
+  }
+
+  function stopScan() {
+    nfcReader = null;
+    resetScanUI();
+    if (document.getElementById('scanStatusTitle').textContent === 'SCANNING...') {
+      setScanState('', 'READY TO SCAN', 'Tap the button below, then hold an NFC tag near your device.');
+    }
+  }
+
+  function resetScanUI() {
+    document.getElementById('scanBtn').style.display = 'inline-flex';
+    document.getElementById('stopScanBtn').style.display = 'none';
+    document.getElementById('scannerRing').className = 'scanner-ring';
+    document.getElementById('scannerCore').className = 'scanner-core';
+  }
+
+  function setScanState(state, title, msg) {
+    const ring = document.getElementById('scannerRing');
+    const core = document.getElementById('scannerCore');
+    const status = document.getElementById('scanStatus');
+    ring.className = 'scanner-ring ' + state;
+    core.className = 'scanner-core ' + state;
+    status.className = 'scan-status ' + state;
+    document.getElementById('scanStatusTitle').textContent = title;
+    document.getElementById('scanStatusMsg').textContent = msg;
+  }
+
+  function demoScan() {
+    const demos = [
+      { id: '04:2F:A1:B3:C8:21:80', type: 'NTAG213', recordType: 'url', records: '1 record', data: 'https://example.com/product/1234' },
+      { id: 'E0:04:01:50:66:19:88:A2', type: 'ISO 15693', recordType: 'text', records: '1 record', data: 'Office Badge - Floor 3' },
+      { id: '04:D8:5B:42:77:04:80', type: 'NTAG215', recordType: 'url', records: '2 records', data: 'https://nfc-tag-demo.io/vcard?id=abc' },
+    ];
+    const demo = demos[Math.floor(Math.random() * demos.length)];
+    scannedTag = demo;
+
+    setScanState('scanning', 'SCANNING...', 'Simulating NFC read...');
+    document.getElementById('scanBtn').style.display = 'none';
+    document.getElementById('stopScanBtn').style.display = 'none';
+
+    setTimeout(() => {
+      document.getElementById('resultId').textContent = demo.id;
+      document.getElementById('resultType').textContent = demo.type;
+      document.getElementById('resultRecords').textContent = demo.records;
+      document.getElementById('resultData').textContent = demo.data;
+      document.getElementById('tagResult').classList.add('visible');
+      setScanState('success', 'TAG DETECTED! (DEMO)', 'Demo tag read. Save it to your library.');
+      document.getElementById('scanBtn').style.display = 'inline-flex';
+      showNotif('Demo scan complete ✓', 'success');
+    }, 1200);
+  }
+
+  function saveScannedTag() {
+    if (!scannedTag) return;
+    openAddDrawer({
+      name: `Tag – ${scannedTag.id.split(':').slice(0,2).join('')}`,
+      id: scannedTag.id,
+      type: scannedTag.type,
+      recordType: scannedTag.recordType || 'raw',
+      payload: scannedTag.data,
+      notes: 'Scanned via NFC Reader'
+    });
+  }
+
+  function copyTagId() {
+    if (!scannedTag) return;
+    navigator.clipboard.writeText(scannedTag.id).then(() => showNotif('Tag ID copied!', 'success'));
+  }
+
+  // ─── Library ──────────────────────────────────────────────
+  function renderEntries() {
+    const list = document.getElementById('entryList');
+    const empty = document.getElementById('emptyState');
+
+    const existing = list.querySelectorAll('.entry-card');
+    existing.forEach(e => e.remove());
+
+    if (entries.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    entries.forEach(entry => {
+      const card = document.createElement('div');
+      card.className = 'entry-card';
+      card.id = 'card-' + entry.id;
+      card.innerHTML = `
+        <div class="entry-top">
+          <div class="entry-name">${esc(entry.name)}</div>
+          <div class="entry-type-badge">${esc(entry.recordType || 'RAW')}</div>
+        </div>
+        <div class="entry-id">${esc(entry.tagId || '—')}</div>
+        <div class="entry-data">${esc(entry.payload || '(no data)')}</div>
+        ${entry.notes ? `<div class="entry-notes">${esc(entry.notes)}</div>` : ''}
+        <div class="entry-actions">
+          <button class="btn btn-outline btn-sm" onclick="editEntry('${entry.id}');event.stopPropagation()">✏️ EDIT</button>
+          <button class="btn btn-success btn-sm" onclick="emulateEntry('${entry.id}');event.stopPropagation()">📡 EMULATE</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteEntry('${entry.id}');event.stopPropagation()">🗑</button>
+        </div>
+      `;
+      card.addEventListener('click', () => toggleCard(entry.id));
+      list.appendChild(card);
+    });
+
+    updateCount();
+    populateEmulateSelect();
+  }
+
+  function toggleCard(id) {
+    const card = document.getElementById('card-' + id);
+    card.classList.toggle('expanded');
+  }
+
+  function openAddDrawer(prefill = null) {
+    editingId = null;
+    document.getElementById('drawerTitle').textContent = 'ADD NFC ENTRY';
+    document.getElementById('fieldName').value = prefill?.name || '';
+    document.getElementById('fieldId').value = prefill?.id || '';
+    document.getElementById('fieldType').value = prefill?.type || 'NTAG213';
+    document.getElementById('fieldPayload').value = prefill?.payload || '';
+    document.getElementById('fieldNotes').value = prefill?.notes || '';
+    const rt = document.getElementById('fieldRecordType');
+    const rvs = [...rt.options].map(o => o.value);
+    rt.value = rvs.includes(prefill?.recordType) ? prefill.recordType : 'text';
+    openDrawer();
+  }
+
+  function editEntry(id) {
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    editingId = id;
+    document.getElementById('drawerTitle').textContent = 'EDIT ENTRY';
+    document.getElementById('fieldName').value = entry.name || '';
+    document.getElementById('fieldId').value = entry.tagId || '';
+    document.getElementById('fieldType').value = entry.type || 'NTAG213';
+    document.getElementById('fieldRecordType').value = entry.recordType || 'text';
+    document.getElementById('fieldPayload').value = entry.payload || '';
+    document.getElementById('fieldNotes').value = entry.notes || '';
+    openDrawer();
+  }
+
+  function saveEntry() {
+    const name = document.getElementById('fieldName').value.trim();
+    if (!name) { showNotif('Name is required.', 'error'); return; }
+
+    const entry = {
+      id: editingId || uid(),
+      name,
+      tagId: document.getElementById('fieldId').value.trim(),
+      type: document.getElementById('fieldType').value,
+      recordType: document.getElementById('fieldRecordType').value,
+      payload: document.getElementById('fieldPayload').value.trim(),
+      notes: document.getElementById('fieldNotes').value.trim(),
+      savedAt: Date.now()
+    };
+
+    if (editingId) {
+      const idx = entries.findIndex(e => e.id === editingId);
+      entries[idx] = entry;
+      showNotif('Entry updated ✓', 'success');
+    } else {
+      entries.unshift(entry);
+      showNotif('Tag saved ✓', 'success');
+    }
+
+    persist();
+    closeDrawer();
+    renderEntries();
+    switchTab('library');
+  }
+
+  function deleteEntry(id) {
+    entries = entries.filter(e => e.id !== id);
+    persist();
+    renderEntries();
+    showNotif('Entry deleted.', 'warn');
+  }
+
+  function emulateEntry(id) {
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    switchTab('emulate');
+    document.getElementById('emulateSelect').value = id;
+    loadEmulateEntry();
+  }
+
+  // ─── Emulate ──────────────────────────────────────────────
+  function populateEmulateSelect() {
+    const sel = document.getElementById('emulateSelect');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Choose a saved tag —</option>';
+    entries.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.name;
+      sel.appendChild(opt);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  function loadEmulateEntry() {
+    const id = document.getElementById('emulateSelect').value;
+    const card = document.getElementById('emulateCard');
+    const actions = document.getElementById('emulateActions');
+    document.getElementById('simStatus').textContent = '';
+    if (!id) { card.style.display = 'none'; actions.style.display = 'none'; return; }
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    document.getElementById('emLabel').textContent = entry.name;
+    document.getElementById('emId').textContent = entry.tagId || '(none)';
+    document.getElementById('emType').textContent = `${entry.type} / ${entry.recordType}`;
+    document.getElementById('emPayload').textContent = entry.payload || '(empty)';
+    const notesRow = document.getElementById('emNotesRow');
+    if (entry.notes) {
+      document.getElementById('emNotes').textContent = entry.notes;
+      notesRow.style.display = 'flex';
+    } else { notesRow.style.display = 'none'; }
+    card.style.display = 'block';
+    actions.style.display = 'flex';
+  }
+
+  function simulateEmit() {
+    const id = document.getElementById('emulateSelect').value;
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+
+    const status = document.getElementById('simStatus');
+    status.className = 'sim-status';
+    status.textContent = 'Preparing...';
+
+    setTimeout(() => {
+      status.className = 'sim-status active';
+      status.textContent = `✓ EMITTED: ${entry.name} @ ${new Date().toLocaleTimeString()}`;
+      showNotif(`Simulated: ${entry.name}`, 'success');
+      console.log('[NFC EMULATE]', JSON.stringify({
+        id: entry.tagId,
+        type: entry.type,
+        records: [{ recordType: entry.recordType, data: entry.payload }]
+      }, null, 2));
+    }, 600);
+  }
+
+  function copyPayload() {
+    const id = document.getElementById('emulateSelect').value;
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    const payload = JSON.stringify({
+      tagId: entry.tagId,
+      type: entry.type,
+      records: [{ recordType: entry.recordType, data: entry.payload }],
+      notes: entry.notes
+    }, null, 2);
+    navigator.clipboard.writeText(payload).then(() => showNotif('Payload JSON copied!', 'success'));
+  }
+
+  // ─── Drawer ───────────────────────────────────────────────
+  function openDrawer() {
+    document.getElementById('overlay').classList.add('active');
+    document.getElementById('drawer').classList.add('active');
+  }
+
+  function closeDrawer() {
+    document.getElementById('overlay').classList.remove('active');
+    document.getElementById('drawer').classList.remove('active');
+    editingId = null;
+  }
+
+  // ─── Utils ────────────────────────────────────────────────
+  function persist() { localStorage.setItem('nfc_entries', JSON.stringify(entries)); }
+  function updateCount() { document.getElementById('entryCountNum').textContent = entries.length; }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function generateId() { return [...Array(7)].map(() => Math.floor(Math.random()*256).toString(16).padStart(2,'0')).join(':').toUpperCase(); }
+  function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function showNotif(msg, type = '') {
+    const n = document.getElementById('notif');
+    n.textContent = msg;
+    n.className = 'notif ' + type + ' show';
+    clearTimeout(n._t);
+    n._t = setTimeout(() => n.classList.remove('show'), 2800);
+  }
+
+  init();
+</script>
+</body>
+</html>
