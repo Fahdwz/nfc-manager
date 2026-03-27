@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Garden Minesweeper - EXPLOSIVE</title>
+    <title>Garden Minesweeper - Pro Edition</title>
     <style>
         :root {
             --light-green: #aad751;
@@ -50,6 +50,7 @@
             border-radius: 15px;
             overflow: hidden;
             box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+            background-color: var(--dark-green);
         }
         .cell {
             display: flex;
@@ -73,7 +74,7 @@
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.75);
             backdrop-filter: blur(8px);
             z-index: 100;
             justify-content: center;
@@ -114,118 +115,65 @@
 <div id="overlay">
     <div class="popup">
         <h2 id="pop-title" style="color:#4a752c; font-size: 8vmin; margin:0;">Boom!</h2>
-        <p id="pop-desc" style="color:#555; font-size: 4vmin; margin: 2vh 0 4vh 0;">Game Over</p>
+        <p id="pop-desc" style="color:#555; font-size: 4vmin; margin: 2vh 0 4vh 0;"></p>
         <button class="btn" onclick="initGame()">Try Again</button>
     </div>
 </div>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════
-   HIGH-VOLUME AUDIO ENGINE
+   AUDIO ENGINE
 ═══════════════════════════════════════════════════════════════ */
 let AC = null;
-
 function wakeAudio() {
     if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
     if (AC.state === 'suspended') AC.resume();
     return AC;
 }
 
-// Global Master Gain
-let _master = null;
-function getMaster() {
-    const ac = wakeAudio();
-    if (!_master) {
-        _master = ac.createGain();
-        _master.gain.value = 1.0; 
-        _master.connect(ac.destination);
-    }
-    return _master;
-}
-
 function sfxBtn() {
     const ac = wakeAudio(); const now = ac.currentTime;
     const osc = ac.createOscillator(); const g = ac.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(300, now);
-    osc.frequency.exponentialRampToValueAtTime(150, now + 0.05);
-    g.gain.setValueAtTime(0.4, now);
-    g.gain.linearRampToValueAtTime(0, now + 0.05);
-    osc.connect(g); g.connect(getMaster());
+    osc.type = 'square'; osc.frequency.setValueAtTime(300, now);
+    g.gain.setValueAtTime(0.3, now); g.gain.linearRampToValueAtTime(0, now + 0.05);
+    osc.connect(g); g.connect(ac.destination);
     osc.start(); osc.stop(now + 0.06);
 }
 
 function sfxFlag() {
     const ac = wakeAudio(); const now = ac.currentTime;
     const osc = ac.createOscillator(); const g = ac.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(200, now);
-    osc.frequency.linearRampToValueAtTime(50, now + 0.1);
-    g.gain.setValueAtTime(0.8, now); // Loudness boost
-    g.gain.linearRampToValueAtTime(0, now + 0.1);
-    osc.connect(g); g.connect(getMaster());
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(200, now);
+    g.gain.setValueAtTime(0.7, now); g.gain.linearRampToValueAtTime(0, now + 0.1);
+    osc.connect(g); g.connect(ac.destination);
     osc.start(); osc.stop(now + 0.11);
 }
 
 function sfxReveal() {
     const ac = wakeAudio(); const now = ac.currentTime;
     const osc = ac.createOscillator(); const g = ac.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(600, now);
-    osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
-    g.gain.setValueAtTime(0.3, now);
-    g.gain.linearRampToValueAtTime(0, now + 0.05);
-    osc.connect(g); g.connect(getMaster());
+    osc.type = 'sine'; osc.frequency.setValueAtTime(600, now);
+    g.gain.setValueAtTime(0.2, now); g.gain.linearRampToValueAtTime(0, now + 0.05);
+    osc.connect(g); g.connect(ac.destination);
     osc.start(); osc.stop(now + 0.06);
 }
 
 function sfxBoom() {
     const ac = wakeAudio(); const now = ac.currentTime;
-    
-    // LAYER 1: The Deep Sub Thump
-    const sub = ac.createOscillator(); const subG = ac.createGain();
-    sub.type = 'sine';
-    sub.frequency.setValueAtTime(150, now);
+    const sub = ac.createOscillator(); const g = ac.createGain();
+    sub.type = 'sine'; sub.frequency.setValueAtTime(150, now);
     sub.frequency.exponentialRampToValueAtTime(20, now + 0.8);
-    subG.gain.setValueAtTime(1.5, now); // CRANKED VOLUME
-    subG.gain.linearRampToValueAtTime(0, now + 0.8);
-    sub.connect(subG); subG.connect(getMaster());
+    g.gain.setValueAtTime(1.5, now); g.gain.linearRampToValueAtTime(0, now + 0.8);
+    sub.connect(g); g.connect(ac.destination);
     sub.start(); sub.stop(now + 0.8);
-
-    // LAYER 2: The Crunch (Noise)
-    const bufSize = ac.sampleRate * 0.5;
-    const buffer = ac.createBuffer(1, bufSize, ac.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
-    const noise = ac.createBufferSource();
-    noise.buffer = buffer;
-    const filter = ac.createBiquadFilter();
-    filter.type = 'lowpass'; filter.frequency.value = 400;
-    const noiseG = ac.createGain();
-    noiseG.gain.setValueAtTime(0.6, now);
-    noiseG.gain.linearRampToValueAtTime(0, now + 0.4);
-    noise.connect(filter); filter.connect(noiseG); noiseG.connect(getMaster());
-    noise.start(); noise.stop(now + 0.5);
-}
-
-function sfxWin() {
-    const ac = wakeAudio(); const now = ac.currentTime;
-    [523, 659, 784, 1046].forEach((f, i) => {
-        const t = now + i * 0.1;
-        const o = ac.createOscillator(); const g = ac.createGain();
-        o.type = 'sine'; o.frequency.value = f;
-        g.gain.setValueAtTime(0.4, t);
-        g.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
-        o.connect(g); g.connect(getMaster());
-        o.start(t); o.stop(t + 0.5);
-    });
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   GAME LOGIC
+   GAME LOGIC (SWIPE + HOLD)
 ═══════════════════════════════════════════════════════════════ */
 const ROWS = 10, COLS = 10, MINES = 10;
-let board, gameOver, timer, timerInt, firstClick, longPress;
+let board, gameOver, timer, timerInt, firstClick;
+let startX, startY, holdTimer;
 
 function initGame() {
     wakeAudio(); sfxBtn();
@@ -246,19 +194,32 @@ function initGame() {
             cell.className = `cell ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
             cell.dataset.r = r; cell.dataset.c = c;
             
+            // Mouse Swipe/Flag
             cell.addEventListener('mousedown', (e) => {
-                wakeAudio();
-                if(e.button === 0) handleReveal(r, c);
-                if(e.button === 2) toggleFlag(r, c);
+                wakeAudio(); startX = e.clientX; startY = e.clientY;
+                if(e.button === 2) toggleFlag(r, c); 
+            });
+            cell.addEventListener('mouseup', (e) => {
+                if(e.button === 0) {
+                    const dist = Math.sqrt((e.clientX - startX)**2 + (e.clientY - startY)**2);
+                    dist > 30 ? toggleFlag(r, c) : handleReveal(r, c);
+                }
             });
             cell.addEventListener('contextmenu', e => e.preventDefault());
 
+            // Mobile Swipe + Hold
             cell.addEventListener('touchstart', (e) => { 
                 e.preventDefault(); wakeAudio();
-                longPress = setTimeout(() => { longPress = null; toggleFlag(r, c); }, 400); 
+                startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+                holdTimer = setTimeout(() => { holdTimer = null; toggleFlag(r, c); }, 400); 
             });
             cell.addEventListener('touchend', (e) => { 
-                if(longPress) { clearTimeout(longPress); longPress = null; handleReveal(r, c); } 
+                if(!holdTimer) return; // Already flagged via hold
+                clearTimeout(holdTimer); holdTimer = null;
+                const endX = e.changedTouches[0].clientX;
+                const endY = e.changedTouches[0].clientY;
+                const dist = Math.sqrt((endX - startX)**2 + (endY - startY)**2);
+                dist > 30 ? toggleFlag(r, c) : handleReveal(r, c);
             });
             grid.appendChild(cell);
         }
@@ -287,28 +248,13 @@ function plantMines(sR, sC) {
 function handleReveal(r, c) {
     if (gameOver || board[r][c].flagged || board[r][c].revealed) return;
     if (firstClick) { plantMines(r, c); firstClick = false; timerInt = setInterval(() => { timer++; document.getElementById('timer').innerText = timer; }, 1000); }
-    
     board[r][c].revealed = true;
     const el = document.getElementById('grid').children[r * COLS + c];
     el.classList.add('revealed');
-    
-    if (board[r][c].isMine) { 
-        sfxBoom(); 
-        endGame(false); 
-        el.innerText = '💣'; 
-        el.style.backgroundColor = '#ff4b2b';
-        return; 
-    }
-    
+    if (board[r][c].isMine) { sfxBoom(); endGame(false); el.innerText = '💣'; el.style.backgroundColor = '#ff4b2b'; return; }
     sfxReveal();
-    if (board[r][c].count > 0) {
-        el.innerText = board[r][c].count;
-        el.classList.add('n' + board[r][c].count);
-    } else {
-        for (let dr = -1; dr <= 1; dr++)
-            for (let dc = -1; dc <= 1; dc++)
-                if (board[r+dr]?.[c+dc]) handleReveal(r+dr, c+dc);
-    }
+    if (board[r][c].count > 0) { el.innerText = board[r][c].count; el.classList.add('n' + board[r][c].count); }
+    else { for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (board[r+dr]?.[c+dc]) handleReveal(r+dr, c+dc); }
     if (board.flat().filter(cell => !cell.isMine).every(cell => cell.revealed)) endGame(true);
 }
 
@@ -322,10 +268,7 @@ function toggleFlag(r, c) {
 
 function endGame(win) {
     gameOver = true; clearInterval(timerInt);
-    if (win) sfxWin();
-    else {
-        board.flat().forEach((cell, i) => { if (cell.isMine) document.getElementById('grid').children[i].innerText = '💣'; });
-    }
+    if (!win) board.flat().forEach((cell, i) => { if (cell.isMine) document.getElementById('grid').children[i].innerText = '💣'; });
     document.getElementById('pop-title').innerText = win ? "Cleared! 🌻" : "Boom! 💥";
     document.getElementById('pop-desc').innerText = win ? `Time: ${timer}s` : "Game Over!";
     document.getElementById('overlay').style.display = 'flex';
